@@ -1,17 +1,7 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
-
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(),
-    VitePWA({
-      manifest: {
-        name: 'Metalic fox',
-        short_name: 'Fox',
-        description: ' Metalic fox',
-        theme_color: '#ffffff',
-        icons: [
+{
+  "name": "Metallic fox",
+  "short_name": "Fox",
+  "icons": [
     {
       "src": "icons/fox_icon-48x48.png",
       "sizes": "48x48",
@@ -63,12 +53,8 @@ export default defineConfig({
       "type": "image/png"
     }
   ],
-        start_url: '.',
-        display: 'standalone',
-
-      },
-      registerType: 'autoUpdate',
-      
-    })
-  ],
-})
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000"
+}
