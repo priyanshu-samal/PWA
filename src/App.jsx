@@ -1,5 +1,37 @@
 import { useState, useEffect } from 'react';
-import './App.css';
+import {
+  Container,
+  Typography,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  Button,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  CircularProgress,
+  Snackbar,
+  Alert,
+  Box,
+  IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
+} from '@mui/material';
+import {
+  Save as SaveIcon,
+  FileCopy as FileCopyIcon,
+  Delete as DeleteIcon,
+  Casino as CasinoIcon,
+  History as HistoryIcon,
+  ClearAll as ClearAllIcon,
+} from '@mui/icons-material';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // IMPORTANT: Replace with your own API key
@@ -15,6 +47,7 @@ function App() {
   const [savedExcuses, setSavedExcuses] = useState([]);
   const [history, setHistory] = useState([]);
   const [offline, setOffline] = useState(!navigator.onLine);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   useEffect(() => {
     const handleOnline = () => setOffline(false);
@@ -81,34 +114,37 @@ function App() {
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = await response.text();
-      const generatedExcuses = text.split('\n').map(e => e.trim()).filter(e => e);
+      const generatedExcuses = text.split('\n').map(e => e.trim()).filter(e => e && e.length > 1 && !e.startsWith('*'));
       setExcuses(generatedExcuses);
 
-      // Cache the generated excuses
       const cache = await caches.open('excuse-cache');
       await cache.put('last-excuses', new Response(JSON.stringify(generatedExcuses)));
 
-      // Add to history
       const newHistory = [...history, { category: currentCategory, tone: currentTone, date: new Date().toLocaleString() }];
       setHistory(newHistory);
       localStorage.setItem('excuseHistory', JSON.stringify(newHistory));
 
     } catch (error) {
       console.error('Error generating excuses:', error);
-      alert('Failed to generate excuses. Please check your API key and try again.');
+      setSnackbar({ open: true, message: 'Failed to generate excuses. Please check your API key.', severity: 'error' });
     }
     setLoading(false);
   };
 
   const saveExcuse = (excuse) => {
+    if (savedExcuses.includes(excuse)) {
+        setSnackbar({ open: true, message: 'Excuse already saved!', severity: 'warning' });
+        return;
+      }
     const newSavedExcuses = [...savedExcuses, excuse];
     setSavedExcuses(newSavedExcuses);
     localStorage.setItem('savedExcuses', JSON.stringify(newSavedExcuses));
+    setSnackbar({ open: true, message: 'Excuse saved!', severity: 'success' });
   };
 
   const copyExcuse = (excuse) => {
     navigator.clipboard.writeText(excuse);
-    alert('Excuse copied to clipboard!');
+    setSnackbar({ open: true, message: 'Excuse copied to clipboard!', severity: 'info' });
   };
 
   const deleteSavedExcuse = (index) => {
@@ -116,95 +152,171 @@ function App() {
     newSavedExcuses.splice(index, 1);
     setSavedExcuses(newSavedExcuses);
     localStorage.setItem('savedExcuses', JSON.stringify(newSavedExcuses));
+    setSnackbar({ open: true, message: 'Excuse deleted.', severity: 'success' });
   };
 
   const clearHistory = () => {
     setHistory([]);
     localStorage.removeItem('excuseHistory');
+    setSnackbar({ open: true, message: 'History cleared.', severity: 'success' });
+  };
+
+  const handleCloseSnackbar = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbar({ ...snackbar, open: false });
   };
 
   return (
-    <div className="container">
-      <h1>Excuse Generator</h1>
-      {offline && <p className="offline-message">You are offline. Showing cached excuses.</p>}
-      <div className="form">
-        <div className="form-group">
-          <label htmlFor="category">Category:</label>
-          <select id="category" value={category} onChange={(e) => setCategory(e.target.value)}>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>Tone:</label>
-          <div className="tones">
-            {tones.map((t) => (
-              <label key={t}>
-                <input
-                  type="radio"
-                  name="tone"
-                  value={t}
-                  checked={tone === t}
-                  onChange={() => setTone(t)}
-                />
-                {t}
-              </label>
-            ))}
-          </div>
-        </div>
-        <div className="form-buttons">
-          <button onClick={() => generateExcuses(false)} disabled={loading || offline}>
-            {loading ? 'Generating...' : 'Generate Excuses'}
-          </button>
-          <button onClick={() => generateExcuses(true)} disabled={loading || offline}>
-            Excuse Roulette
-          </button>
-        </div>
-      </div>
-      <div className="excuses">
-        {excuses.map((excuse, index) => (
-          <div key={index} className="excuse">
-            <p>{excuse}</p>
-            <div className="actions">
-              <button onClick={() => saveExcuse(excuse)}>Save</button>
-              <button onClick={() => copyExcuse(excuse)}>Copy</button>
-            </div>
-          </div>
-        ))}
-      </div>
+    <Container maxWidth="md" sx={{ my: 4 }}>
+      <Card sx={{ p: 3, boxShadow: 3 }}>
+        <Typography variant="h4" component="h1" gutterBottom align="center" color="primary">
+          Excuse Generator
+        </Typography>
+        {offline && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            You are offline. Showing cached excuses.
+          </Alert>
+        )}
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth>
+              <InputLabel id="category-label">Category</InputLabel>
+              <Select
+                labelId="category-label"
+                id="category"
+                value={category}
+                label="Category"
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                {categories.map((cat) => (
+                  <MenuItem key={cat} value={cat}>
+                    {cat}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <FormControl component="fieldset">
+              <RadioGroup row aria-label="tone" name="tone" value={tone} onChange={(e) => setTone(e.target.value)}>
+                {tones.map((t) => (
+                  <FormControlLabel key={t} value={t} control={<Radio />} label={t} />
+                ))}
+              </RadioGroup>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} container spacing={2} justifyContent="center">
+            <Grid item>
+                <Button
+                    variant="contained"
+                    onClick={() => generateExcuses(false)}
+                    disabled={loading || offline}
+                    startIcon={loading ? <CircularProgress size={20} color="inherit" /> : null}
+                >
+                    {loading ? 'Generating...' : 'Generate Excuses'}
+                </Button>
+            </Grid>
+            <Grid item>
+                <Button
+                    variant="outlined"
+                    onClick={() => generateExcuses(true)}
+                    disabled={loading || offline}
+                    startIcon={<CasinoIcon />}
+                >
+                    Excuse Roulette
+                </Button>
+            </Grid>
+          </Grid>
+        </Grid>
+      </Card>
+
+      {excuses.length > 0 && (
+        <Box mt={4}>
+            <Typography variant="h5" component="h2" gutterBottom align="center">
+                Generated Excuses
+            </Typography>
+            <Grid container spacing={2}>
+                {excuses.map((excuse, index) => (
+                <Grid item xs={12} key={index}>
+                    <Card variant="outlined">
+                    <CardContent>
+                        <Typography>{excuse}</Typography>
+                    </CardContent>
+                    <CardActions sx={{ justifyContent: 'flex-end' }}>
+                        <IconButton onClick={() => saveExcuse(excuse)} color="primary">
+                            <SaveIcon />
+                        </IconButton>
+                        <IconButton onClick={() => copyExcuse(excuse)}>
+                            <FileCopyIcon />
+                        </IconButton>
+                    </CardActions>
+                    </Card>
+                </Grid>
+                ))}
+            </Grid>
+        </Box>
+      )}
 
       {savedExcuses.length > 0 && (
-        <div className="saved-excuses">
-          <h2>Saved Excuses</h2>
-          {savedExcuses.map((excuse, index) => (
-            <div key={index} className="excuse">
-              <p>{excuse}</p>
-              <div className="actions">
-                <button onClick={() => deleteSavedExcuse(index)}>Delete</button>
-                <button onClick={() => copyExcuse(excuse)}>Copy</button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <Box mt={4}>
+          <Typography variant="h5" component="h2" gutterBottom align="center">
+            Saved Excuses
+          </Typography>
+          <Grid container spacing={2}>
+            {savedExcuses.map((excuse, index) => (
+              <Grid item xs={12} key={index}>
+                <Card variant="outlined">
+                  <CardContent>
+                    <Typography>{excuse}</Typography>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: 'flex-end' }}>
+                    <IconButton onClick={() => deleteSavedExcuse(index)} color="secondary">
+                      <DeleteIcon />
+                    </IconButton>
+                    <IconButton onClick={() => copyExcuse(excuse)}>
+                      <FileCopyIcon />
+                    </IconButton>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
       )}
 
       {history.length > 0 && (
-        <div className="history">
-          <h2>Excuse History</h2>
-          <button onClick={clearHistory}>Clear History</button>
-          <ul>
-            {history.map((item, index) => (
-              <li key={index}>
-                {item.date}: {item.category} ({item.tone})
-              </li>
-            ))}
-          </ul>
-        </div>
+        <Box mt={4}>
+            <Box display="flex" justifyContent="space-between" alignItems="center">
+                <Typography variant="h5" component="h2" gutterBottom>
+                    <HistoryIcon sx={{ verticalAlign: 'middle', mr: 1 }}/> Excuse History
+                </Typography>
+                <Button onClick={clearHistory} startIcon={<ClearAllIcon />} color="secondary">
+                    Clear History
+                </Button>
+            </Box>
+          <Card variant="outlined">
+            <List dense>
+              {history.map((item, index) => (
+                <div key={index}>
+                  <ListItem>
+                    <ListItemText primary={`${item.category} (${item.tone})`} secondary={item.date} />
+                  </ListItem>
+                  {index < history.length - 1 && <Divider />}
+                </div>
+              ))}
+            </List>
+          </Card>
+        </Box>
       )}
-    </div>
+
+        <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={handleCloseSnackbar}>
+            <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+                {snackbar.message}
+            </Alert>
+        </Snackbar>
+    </Container>
   );
 }
 
